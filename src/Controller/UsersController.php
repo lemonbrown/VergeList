@@ -18,8 +18,12 @@ class UsersController extends AppController
      */
     public function index()
     {
+		$this->loadModel('Posts');
         $users = $this->paginate($this->Users);
+		
+		$posts = $this->Posts->find('all');
 
+		$this->set('posts', $posts);
         $this->set(compact('users'));
         $this->set('_serialize', ['users']);
     }
@@ -32,7 +36,7 @@ class UsersController extends AppController
      * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
      */
     public function view($id = null)
-    {
+    {	
         $user = $this->Users->get($id, [
             'contain' => []
         ]);
@@ -108,4 +112,55 @@ class UsersController extends AppController
 
         return $this->redirect(['action' => 'index']);
     }
+	
+	public function post($id = null){
+		$this->loadModel('Posts');
+		$post = $this->Posts->newEntity();
+		
+		if($id != null){
+			$post = $this->Posts->get($id);
+		}
+		
+		$this->set('post', $post);
+	}
+	
+	public function savePost(){
+		$this->autoRender = false;
+	
+		$this->loadModel('Posts');
+		$this->loadModel('ListsItems');
+		$this->loadModel('Tags');
+		$this->loadModel('PostsListsItems');
+		$this->loadModel('PostsTags');
+		
+		$post = $this->Posts->newEntity();
+		$post = $this->Posts->patchEntity($post, $this->request->data['post']);
+		$post->timestamp = time();
+		$this->Posts->save($post);
+		var_dump($post);
+		
+		$listItems = $this->request->data['listItems'];
+		$tags = $this->request->data['tags'];
+		
+		foreach($listItems as $listItem){
+			$listItemModel = $this->ListsItems->newEntity();
+			$listItemModel = $this->ListsItems->patchEntity($listItemModel, $listItem);
+			$listItemModel = $this->ListsItems->save($listItemModel);
+			
+			$postListItem = $this->PostsListsItems->newEntity();
+			$postListItem->post_id = $post->id;
+			$postListItem->list_items_id = $listItemModel->id;
+			$this->PostsListsItems->save($postListItem);
+		}
+		
+		foreach(split(",", $tags) as $tag){
+			$tagModel = $this->Tags->newEntity();
+			$tagModel->name = $tag;
+			$tagModel = $this->Tags->save($tagModel);
+			$postTag = $this->PostTags->newEntity();
+			$postTag->post_id = $post->id;
+			$postTag->tag_id = $tagModel->id;
+			$this->PostsTags->save($postTag);
+		}
+	}
 }
